@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Solicitud de autorización — Firmas</title>
+<style>
+  :root{
+    --bg:#EDEBE4;
+    --paper:#FFFFFF;
+    --ink:#1a1a1a;
+    --muted:#6b6b6b;
+    --navy:#1F4E79;
+    --navy-dark:#163a5c;
+    --danger:#9C3B3B;
+    --sans:Arial,'Helvetica Neue',Helvetica,sans-serif;
+    --ui:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+    --page-w:816px;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:var(--ui);
+    background:var(--bg);
+    color:var(--ink);
+    padding:20px 12px 90px;
+    min-height:100vh;
+  }
+
+  .toolbar{
+    max-width:var(--page-w);
+    margin:0 auto 16px;
+    background:#fff;
+    border:1px solid #ddd8c8;
+    border-radius:8px;
+    padding:14px 18px;
+  }
+  .toolbar h1{ font-family:var(--ui); font-size:15px; margin:0 0 4px; color:var(--navy-dark); }
+  .toolbar p{ font-family:var(--ui); font-size:12.5px; color:var(--muted); margin:0; line-height:1.5; }
+
+  #pages-root{ max-width:var(--page-w); margin:0 auto; }
+
+  .page{
+    width:var(--page-w);
+    background:var(--paper);
+    box-shadow:0 8px 24px rgba(0,0,0,0.12);
+    padding:64px 56px;
+    margin-bottom:22px;
+  }
+
+  .letter{
+    font-family:var(--sans);
+    font-size:14.5px;
+    line-height:1.65;
+    color:#1a1a1a;
+  }
+  .letter p{ margin:0 0 14px; }
+  .letter .tight p{ margin:0; }
+  .letter .ref{ font-weight:700; margin:16px 0; }
+
+  .grid-page-title{
+    font-family:var(--ui);
+    font-size:13px;
+    font-weight:700;
+    color:var(--navy-dark);
+    margin-bottom:26px;
+  }
+
+  /* ---- Unified signature grid: 2 columns, generous size, used on every page ---- */
+  .sig-grid{
+    display:grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap:48px;
+    row-gap:46px;
+  }
+  .page1-grid{ margin-top:34px; }
+
+  .signer-block{ }
+  .pad-wrap{ position:relative; touch-action:none; }
+  canvas.pad{ display:block; width:100%; height:78px; touch-action:none; cursor:crosshair; }
+  .pad-hint{
+    position:absolute; left:2px; top:26px;
+    font-family:var(--sans); font-style:italic; color:#c9c9c9;
+    pointer-events:none; font-size:12.5px;
+  }
+  .sign-rule{ border:none; border-top:1px solid #444; margin:2px 0 8px; }
+  .printed-line{
+    font-family:var(--sans); font-size:14px; color:#1a1a1a; margin:1px 0;
+    display:flex; align-items:baseline; gap:6px;
+  }
+  .printed-line.ci{ padding-left:34px; }
+  .printed-line span{ white-space:nowrap; }
+  .printed-line input, .printed-line .print-value{
+    font-family:var(--sans); font-size:14px; color:#1a1a1a; padding:0 2px; flex:1; min-width:0;
+  }
+  .printed-line input{ border:none; background:transparent; }
+  .printed-line input:focus{ outline:none; background:#f4f7fa; }
+  .printed-line input::placeholder{ color:#c2c2c2; font-style:italic; }
+  .printed-line .print-value{ display:none; }
+
+  .block-controls{ margin-top:6px; display:flex; gap:12px; }
+  .util-btn{ background:none; border:none; font-family:var(--ui); font-size:11px; cursor:pointer; padding:0; }
+  .util-btn.clear{ color:var(--navy); }
+  .util-btn.remove{ color:var(--danger); }
+
+  .controls-outside{ max-width:var(--page-w); margin:0 auto; }
+  .add-btn{
+    width:100%; background:transparent; border:1.5px dashed var(--navy); color:var(--navy);
+    font-family:var(--ui); font-weight:600; font-size:13px; padding:12px; border-radius:6px;
+    cursor:pointer; margin-bottom:14px;
+  }
+  .add-btn:hover{ background:rgba(31,78,121,0.06); }
+  .pdf-btn{
+    width:100%; background:var(--navy); color:#fff; border:none; font-family:var(--ui);
+    font-weight:700; font-size:14px; letter-spacing:0.02em; padding:15px 20px; border-radius:6px;
+    cursor:pointer; transition:background .15s ease;
+  }
+  .pdf-btn:hover{ background:var(--navy-dark); }
+  .pdf-btn:disabled{ background:#9aa7b1; cursor:wait; }
+  .status{ font-family:var(--ui); font-size:12px; color:var(--muted); margin-top:10px; min-height:16px; text-align:center; }
+
+  @media (max-width:480px){
+    :root{ --page-w:100%; }
+    .page{ padding:28px 20px; }
+    .sig-grid{ grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="toolbar">
+  <h1>Solicitud — recolección de firmas</h1>
+  <p>Cada firmante completa su nombre y carnet, y firma con el dedo o el mouse. La primera hoja admite 2 firmas (una junto a otra); las siguientes hojas admiten 10 firmas cada una, en 2 columnas.</p>
+</div>
+
+<div id="pages-root">
+  <div class="page" id="page1">
+    <div class="letter">
+      <p>Santa Cruz de la Sierra, 22 de julio de 2026</p>
+      <div class="tight">
+        <p>Señor</p>
+        <p><strong>Ing. Wilmer Campos Saavedra</strong></p>
+        <p>Decano de la Universidad Privada Domingo Savio</p>
+        <p>Presente. -</p>
+      </div>
+      <p class="ref">Ref.: Solicitud de autorización para clases virtuales por motivos climatológicos</p>
+      <p>De mi mayor consideración:</p>
+      <p>Por medio de la presente, me dirijo a su autoridad para solicitar muy respetuosamente la autorización excepcional para que las clases programadas se desarrollen en modalidad virtual mientras persistan las condiciones climatológicas adversas que afectan la movilidad y seguridad de estudiantes y docentes.</p>
+      <p>Las intensas lluvias y las dificultades de tránsito representan un riesgo para el normal desplazamiento hacia el campus universitario. En ese sentido, la modalidad virtual permitirá garantizar la continuidad del proceso de enseñanza–aprendizaje sin afectar el desarrollo de los contenidos académicos.</p>
+      <p>Agradezco de antemano la atención brindada a la presente solicitud y quedo a la espera de una respuesta favorable.</p>
+      <p>Sin otro particular, me despido con las consideraciones más distinguidas.</p>
+      <p>Atentamente,</p>
+    </div>
+    <div class="sig-grid page1-grid" id="page1Signatures"></div>
+  </div>
+</div>
+
+<div class="controls-outside">
+  <button class="add-btn" id="addSigner" type="button">+ Agregar otro firmante</button>
+  <button class="pdf-btn" id="genPdf" type="button">Generar PDF</button>
+  <div class="status" id="status"></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script>
+(function(){
+  const page1Signatures = document.getElementById('page1Signatures');
+  const pagesRoot = document.getElementById('pages-root');
+
+  const SLOTS_PER_EXTRA_PAGE = 10; // 2 columns x 5 rows, generously sized
+
+  let blocks = [];
+  let extraPageEls = [];
+
+  function makeSignerBlock(){
+    const block = document.createElement('div');
+    block.className = 'signer-block';
+    block.dataset.sized = '0';
+    block.innerHTML = `
+      <div class="pad-wrap">
+        <canvas class="pad"></canvas>
+        <div class="pad-hint">Firme aquí</div>
+      </div>
+      <hr class="sign-rule">
+      <div class="printed-line">
+        <span>Estudiante:</span>
+        <input type="text" class="name-input" placeholder="Ej. Juan Pérez">
+        <span class="print-value name-print"></span>
+      </div>
+      <div class="printed-line ci">
+        <span>C.I.</span>
+        <input type="text" class="ci-input" placeholder="Ej. 12345678 SC">
+        <span class="print-value ci-print"></span>
+      </div>
+      <div class="block-controls">
+        <button class="util-btn clear" type="button">Limpiar firma</button>
+        <button class="util-btn remove" type="button">Quitar firmante</button>
+      </div>
+    `;
+
+    const canvas = block.querySelector('canvas.pad');
+    const hint = block.querySelector('.pad-hint');
+    const clearBtn = block.querySelector('.clear');
+    const removeBtn = block.querySelector('.remove');
+
+    function sizeCanvasOnce(){
+      if (block.dataset.sized === '1') return;
+      const rect = canvas.getBoundingClientRect();
+      if (rect.width === 0 || rect.height === 0) { requestAnimationFrame(sizeCanvasOnce); return; }
+      const ratio = window.devicePixelRatio || 1;
+      canvas.width = rect.width * ratio;
+      canvas.height = rect.height * ratio;
+      const ctx = canvas.getContext('2d');
+      ctx.scale(ratio, ratio);
+      ctx.lineWidth = 1.8;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.strokeStyle = '#1a3a63';
+      block.dataset.sized = '1';
+    }
+    block._sizeCanvasOnce = sizeCanvasOnce;
+
+    let drawing = false;
+    let hasDrawn = false;
+    let last = {x:0,y:0};
+
+    function getPos(evt){
+      const rect = canvas.getBoundingClientRect();
+      const point = evt.touches ? evt.touches[0] : evt;
+      return { x: point.clientX - rect.left, y: point.clientY - rect.top };
+    }
+    function start(evt){
+      evt.preventDefault();
+      drawing = true;
+      last = getPos(evt);
+      if(!hasDrawn){ hasDrawn = true; hint.style.display = 'none'; }
+    }
+    function move(evt){
+      if(!drawing) return;
+      evt.preventDefault();
+      const pos = getPos(evt);
+      const ctx = canvas.getContext('2d');
+      ctx.beginPath();
+      ctx.moveTo(last.x, last.y);
+      ctx.lineTo(pos.x, pos.y);
+      ctx.stroke();
+      last = pos;
+    }
+    function end(){ drawing = false; }
+
+    canvas.addEventListener('mousedown', start);
+    canvas.addEventListener('mousemove', move);
+    window.addEventListener('mouseup', end);
+    canvas.addEventListener('touchstart', start, {passive:false});
+    canvas.addEventListener('touchmove', move, {passive:false});
+    canvas.addEventListener('touchend', end);
+
+    clearBtn.addEventListener('click', function(){
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      hasDrawn = false;
+      hint.style.display = 'block';
+    });
+
+    removeBtn.addEventListener('click', function(){
+      const i = blocks.indexOf(block);
+      if (i > -1) blocks.splice(i,1);
+      relayout();
+    });
+
+    return block;
+  }
+
+  function clearExtraPages(){
+    extraPageEls.forEach(function(pageEl){
+      pageEl.querySelectorAll('.signer-block').forEach(function(b){
+        if (b.parentNode) b.parentNode.removeChild(b);
+      });
+      if (pageEl.parentNode) pageEl.parentNode.removeChild(pageEl);
+    });
+    extraPageEls = [];
+  }
+
+  function relayout(){
+    blocks.forEach(function(b){
+      if (b.parentNode) b.parentNode.removeChild(b);
+    });
+    clearExtraPages();
+
+    const page1Blocks = blocks.slice(0, 2);
+    page1Blocks.forEach(function(b){ page1Signatures.appendChild(b); });
+
+    const remaining = blocks.slice(2);
+    for (let i = 0; i < remaining.length; i += SLOTS_PER_EXTRA_PAGE) {
+      const chunk = remaining.slice(i, i + SLOTS_PER_EXTRA_PAGE);
+
+      const pageEl = document.createElement('div');
+      pageEl.className = 'page';
+
+      const title = document.createElement('div');
+      title.className = 'grid-page-title';
+      title.textContent = 'Firmas de estudiantes (continuación)';
+      pageEl.appendChild(title);
+
+      const grid = document.createElement('div');
+      grid.className = 'sig-grid';
+      chunk.forEach(function(b){ grid.appendChild(b); });
+      pageEl.appendChild(grid);
+
+      pagesRoot.appendChild(pageEl);
+      extraPageEls.push(pageEl);
+    }
+
+    blocks.forEach(function(b){
+      if (b.dataset.sized === '0') requestAnimationFrame(b._sizeCanvasOnce);
+    });
+  }
+
+  document.getElementById('addSigner').addEventListener('click', function(){
+    const b = makeSignerBlock();
+    blocks.push(b);
+    relayout();
+  });
+
+  blocks.push(makeSignerBlock());
+  blocks.push(makeSignerBlock());
+  blocks.push(makeSignerBlock());
+  relayout();
+
+  document.getElementById('genPdf').addEventListener('click', async function(){
+    const btn = this;
+    const status = document.getElementById('status');
+    btn.disabled = true;
+    status.textContent = 'Generando PDF, un momento...';
+
+    const utilBtns = document.querySelectorAll('.block-controls');
+    const hints = document.querySelectorAll('.pad-hint');
+    utilBtns.forEach(b => b.style.display = 'none');
+    hints.forEach(h => h.style.visibility = 'hidden');
+
+    const nameInputs = document.querySelectorAll('.name-input');
+    const ciInputs = document.querySelectorAll('.ci-input');
+    nameInputs.forEach(inp => {
+      const span = inp.parentElement.querySelector('.name-print');
+      span.textContent = inp.value;
+      inp.style.display = 'none';
+      span.style.display = 'inline';
+    });
+    ciInputs.forEach(inp => {
+      const span = inp.parentElement.querySelector('.ci-print');
+      span.textContent = inp.value;
+      inp.style.display = 'none';
+      span.style.display = 'inline';
+    });
+
+    function restoreInputs(){
+      nameInputs.forEach(inp => {
+        const span = inp.parentElement.querySelector('.name-print');
+        inp.style.display = '';
+        span.style.display = 'none';
+      });
+      ciInputs.forEach(inp => {
+        const span = inp.parentElement.querySelector('.ci-print');
+        inp.style.display = '';
+        span.style.display = 'none';
+      });
+      utilBtns.forEach(b => b.style.display = 'flex');
+      hints.forEach(h => h.style.visibility = 'visible');
+    }
+
+    try {
+      const pageEls = Array.from(document.querySelectorAll('#pages-root .page'));
+      const { jsPDF } = window.jspdf;
+      const pdf = new jsPDF({ unit: 'pt', format: 'letter' });
+      const pageW = pdf.internal.pageSize.getWidth();
+      const pageH = pdf.internal.pageSize.getHeight();
+
+      for (let i = 0; i < pageEls.length; i++) {
+        const canvas = await html2canvas(pageEls[i], { scale: 2, backgroundColor: '#FFFFFF' });
+        const imgData = canvas.toDataURL('image/jpeg', 0.95);
+        const ratio = Math.min(pageW / canvas.width, pageH / canvas.height);
+        const imgW = canvas.width * ratio;
+        const imgH = canvas.height * ratio;
+        const x = (pageW - imgW) / 2;
+        const y = 0;
+        if (i > 0) pdf.addPage();
+        pdf.addImage(imgData, 'JPEG', x, y, imgW, imgH);
+      }
+
+      pdf.save('Solicitud_Clases_Virtuales_Firmada.pdf');
+      status.textContent = 'PDF descargado correctamente.';
+    } catch (err) {
+      status.textContent = 'Ocurrió un error generando el PDF. Intenta de nuevo.';
+      console.error(err);
+    } finally {
+      restoreInputs();
+      btn.disabled = false;
+    }
+  });
+})();
+</script>
+
+</body>
+</html>
