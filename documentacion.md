@@ -137,15 +137,63 @@ organizador. Los datos personales (nombre, CI, firma) están protegidos.
   política `cualquiera puede firmar` (rol `anon`) confirma que está habilitado a
   propósito — es el funcionamiento normal de la página pública.
 
-### Recomendaciones adicionales
+### Endurecimiento aplicado (2026-07-22)
 
-1. Verificar en Supabase que RLS esté **activado** en la tabla `firmas` y que las
-   políticas sean: `INSERT` para `anon`; `SELECT`/`UPDATE`/`DELETE` solo para el
-   rol autenticado (`authenticated`).
-2. Considerar un límite de tamaño para el campo `firma` (base64) y validación
-   server-side, para evitar que alguien envíe cargas enormes con la clave `anon`.
-3. Opcional: limitar la frecuencia de inserciones (rate limiting) para evitar spam
-   de firmas falsas, ya que el `INSERT` es público.
+Se ejecutó SQL en Supabase (editor SQL, rol `postgres`) para reforzar la tabla
+`firmas`. Todo se verificó después de aplicarlo:
+
+**1) Restricciones de tamaño y formato (CHECK constraints)** — confirmadas con
+`pg_constraint`:
+
+| Restricción     | Regla aplicada a cada firma nueva                     |
+|-----------------|-------------------------------------------------------|
+| `firma_formato` | La firma debe empezar con `data:image/png;base64,`.   |
+| `firma_tam_max` | La firma no puede pasar de **400.000 caracteres**.    |
+| `nombre_tam`    | Nombre entre **3 y 80** caracteres.                   |
+| `ci_tam`        | Carnet entre **4 y 30** caracteres.                   |
+
+Se agregaron con `NOT VALID` para que apliquen solo a firmas **nuevas** sin
+revalidar las 21 existentes.
+
+**2) Rate limiting (trigger `trg_limite_firmas`)** — confirmado con `pg_trigger`
+(existe y está habilitado). Antes de cada inserción cuenta las firmas de los
+últimos **10 segundos**; si ya hay **8 o más**, rechaza la inserción con un mensaje
+de error. Frena inserciones masivas automáticas.
+
+> **Alcance del rate limiting:** es un límite *global* (no por IP, porque Supabase
+> free no expone la IP a nivel de tabla). Frena spam automático masivo, pero un
+> atacante paciente que espacie las inserciones podría evadirlo. Para bloqueo por
+> IP haría falta una Edge Function. Para una campaña de firmas puntual, el trigger
+> global es suficiente. El umbral (8 cada 10 s) se puede ajustar.
+
+**Hallazgo adicional:** la política de INSERT `cualquiera puede firmar` (rol `anon`)
+**ya tenía** una condición `WITH CHECK` propia que valida el largo del nombre (y
+más campos). Por eso, al probar inserciones inválidas con la clave `anon`, fueron
+rechazadas (error `42501` de RLS) **antes** de llegar a las restricciones CHECK.
+Las nuevas restricciones y el trigger funcionan como **segunda capa de defensa**;
+el rate limiting es protección genuinamente nueva. Las inserciones legítimas de la
+página siguen funcionando, porque una firma real cumple tanto la condición RLS como
+las restricciones CHECK.
+
+**Cómo revertirlo** (si alguna vez hiciera falta):
+
+```sql
+drop trigger if exists trg_limite_firmas on public.firmas;
+drop function if exists public.limite_firmas();
+alter table public.firmas
+  drop constraint if exists firma_formato,
+  drop constraint if exists firma_tam_max,
+  drop constraint if exists nombre_tam,
+  drop constraint if exists ci_tam;
+```
+
+### Recomendaciones pendientes (opcionales)
+
+1. Si se quiere un rate limiting **por IP** real, migrar la inserción a una Supabase
+   Edge Function que valide la IP de origen.
+2. Añadir el mismo límite de tamaño del lado del cliente (`index.html`) para dar un
+   mensaje más claro al usuario antes de enviar (mejora de experiencia, no de
+   seguridad).
 
 ---
 

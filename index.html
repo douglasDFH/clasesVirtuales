@@ -191,6 +191,9 @@
   // ── Configuración de Supabase ───────────────────────────────────────────────
   const SUPABASE_URL = 'https://ithfislojjtnbasvfrcy.supabase.co';
   const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml0aGZpc2xvamp0bmJhc3ZmcmN5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ3NDQ3NDMsImV4cCI6MjEwMDMyMDc0M30.9c-mDUwYfO_8ONvdKVH7j2oAGYaYzFOSArIVSLANVY0';
+  // Límite de tamaño de la firma. Debe coincidir con la restricción firma_tam_max
+  // de la base de datos (Supabase), que es la que realmente aplica el tope.
+  const FIRMA_MAX_CHARS = 400000;
   // ────────────────────────────────────────────────────────────────────────────
 
   const canvas = document.getElementById('pad');
@@ -356,6 +359,12 @@
     if (!firma){
       status.className = 'status error';
       status.textContent = 'No se pudo leer la firma. Intenta firmar de nuevo.';
+      return;
+    }
+    // Límite de tamaño (mejora de experiencia; el tope real lo aplica la base de datos).
+    if (firma.length > FIRMA_MAX_CHARS){
+      status.className = 'status error';
+      status.textContent = 'La firma es demasiado grande. Firma de forma más simple e intenta otra vez.';
       return;
     }
 
