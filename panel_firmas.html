@@ -130,6 +130,7 @@
   </div>
 
   <button class="btn" id="loginBtn" type="button">Entrar</button>
+  <button type="button" id="forgotBtn" style="display:block;margin:10px auto 0;background:none;border:none;color:var(--navy);font-size:12.5px;cursor:pointer;padding:4px 0;text-decoration:underline;font-family:var(--ui);">¿Olvidaste tu contraseña?</button>
   <div class="status" id="loginStatus"></div>
 </div>
 
@@ -175,6 +176,7 @@
   const emailInput = document.getElementById('email');
   const passInput = document.getElementById('pass');
   const loginBtn = document.getElementById('loginBtn');
+  const forgotBtn = document.getElementById('forgotBtn');
   const loginStatus = document.getElementById('loginStatus');
   const logoutBtn = document.getElementById('logoutBtn');
   const whoami = document.getElementById('whoami');
@@ -271,6 +273,31 @@
       sayLogin('No se pudo entrar: ' + err.message, true);
     } finally {
       loginBtn.disabled = false;
+    }
+  }
+
+  // Envía el correo de recuperación de contraseña al correo escrito arriba.
+  // Supabase redirige el enlace del correo a la Site URL (recuperar.html).
+  async function recuperar(){
+    const email = emailInput.value.trim();
+    if (!email){ sayLogin('Escribe tu correo arriba y vuelve a pulsar "¿Olvidaste tu contraseña?".', true); return; }
+    forgotBtn.disabled = true;
+    sayLogin('Enviando correo de recuperación...');
+    try{
+      const res = await fetch(SUPABASE_URL + '/auth/v1/recover', {
+        method: 'POST',
+        headers: { 'apikey': SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email })
+      });
+      if (!res.ok){
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.msg || data.error_description || data.message || ('HTTP ' + res.status));
+      }
+      sayLogin('Si el correo está registrado, te enviamos un enlace para cambiar tu contraseña. Revisa tu bandeja de entrada (y la carpeta de spam).');
+    } catch(err){
+      sayLogin('No se pudo enviar el correo: ' + err.message, true);
+    } finally {
+      forgotBtn.disabled = false;
     }
   }
 
@@ -482,6 +509,7 @@
   });
 
   loginBtn.addEventListener('click', login);
+  forgotBtn.addEventListener('click', recuperar);
   logoutBtn.addEventListener('click', cerrarSesion);
   loadBtn.addEventListener('click', cargar);
   passInput.addEventListener('keydown', e => { if (e.key === 'Enter') login(); });
