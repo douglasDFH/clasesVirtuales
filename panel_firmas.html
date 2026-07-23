@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Panel privado — Firmas recolectadas</title>
+<style>
+  :root{
+    --bg:#EDEBE4;
+    --paper:#FFFFFF;
+    --ink:#1a1a1a;
+    --muted:#6b6b6b;
+    --navy:#1F4E79;
+    --navy-dark:#163a5c;
+    --danger:#9C3B3B;
+    --sans:Arial,'Helvetica Neue',Helvetica,sans-serif;
+    --ui:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+    --page-w:816px;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; font-family:var(--ui); background:var(--bg); color:var(--ink);
+    padding:20px 12px 90px; min-height:100vh;
+  }
+
+  .panel{
+    max-width:var(--page-w); margin:0 auto 16px; background:#fff;
+    border:1px solid #ddd8c8; border-radius:8px; padding:18px 20px;
+  }
+  .panel h1{ font-size:16px; margin:0 0 4px; color:var(--navy-dark); }
+  .panel .sub{ font-size:12.5px; color:var(--muted); margin:0 0 16px; line-height:1.5; }
+
+  .field{ margin-bottom:12px; }
+  .field label{ display:block; font-size:12px; font-weight:600; color:var(--navy-dark); margin-bottom:4px; }
+  .field input{
+    width:100%; font-family:var(--sans); font-size:14px;
+    padding:10px 12px; border:1px solid #ccc6b6; border-radius:5px;
+  }
+  .field input:focus{ outline:none; border-color:var(--navy); }
+
+  .btn{
+    background:var(--navy); color:#fff; border:none; font-family:var(--ui);
+    font-weight:700; font-size:14px; padding:13px 20px; border-radius:6px; cursor:pointer;
+  }
+  .btn:hover{ background:var(--navy-dark); }
+  .btn:disabled{ background:#9aa7b1; cursor:wait; }
+  .btn.ghost{ background:transparent; color:var(--navy); border:1.5px solid var(--navy); }
+  .btn.ghost:hover{ background:rgba(31,78,121,.06); }
+  .btn.small{ font-size:11.5px; padding:6px 11px; font-weight:600; }
+  .row{ display:flex; gap:10px; flex-wrap:wrap; }
+  .row .btn{ flex:1; min-width:180px; }
+
+  .status{ font-size:12.5px; color:var(--muted); margin-top:12px; min-height:18px; line-height:1.5; }
+  .status.error{ color:var(--danger); }
+
+  .who-bar{
+    display:flex; justify-content:space-between; align-items:center; gap:10px;
+    font-size:12.5px; color:var(--muted); margin-bottom:14px; flex-wrap:wrap;
+  }
+
+  .list{ max-width:var(--page-w); margin:0 auto 16px; }
+  .list-head{
+    display:flex; justify-content:space-between; align-items:center; gap:10px;
+    font-size:12.5px; color:var(--muted); padding:0 4px 8px; flex-wrap:wrap;
+  }
+  .item{
+    display:flex; align-items:center; gap:12px; background:#fff;
+    border:1px solid #ddd8c8; border-radius:6px; padding:10px 14px; margin-bottom:7px;
+  }
+  .item input[type=checkbox]{ width:17px; height:17px; flex:none; accent-color:var(--navy); }
+  .item img{ height:42px; width:120px; object-fit:contain; flex:none; }
+  .item .who{ flex:1; min-width:0; }
+  .item .who b{ font-size:13.5px; display:block; }
+  .item .who small{ font-size:11.5px; color:var(--muted); }
+  .item .del{
+    background:none; border:none; color:var(--danger); font-size:11.5px; cursor:pointer; flex:none;
+  }
+  .dup{ border-color:#e0c07a; background:#fffaf0; }
+  .dup .who small{ color:#a07617; }
+
+  /* ── Documento que se convierte en PDF ── */
+  #pages-root{ max-width:var(--page-w); margin:0 auto; }
+  .page{
+    width:var(--page-w); background:var(--paper);
+    box-shadow:0 8px 24px rgba(0,0,0,0.12);
+    padding:64px 56px; margin-bottom:22px;
+  }
+  .letter{ font-family:var(--sans); font-size:14.5px; line-height:1.65; color:#1a1a1a; }
+  .letter p{ margin:0 0 14px; }
+  .letter .tight p{ margin:0; }
+  .letter .ref{ font-weight:700; margin:16px 0; }
+  .grid-page-title{
+    font-family:var(--ui); font-size:13px; font-weight:700;
+    color:var(--navy-dark); margin-bottom:26px;
+  }
+  .sig-grid{ display:grid; grid-template-columns:1fr 1fr; column-gap:48px; row-gap:46px; }
+  .page1-grid{ margin-top:34px; }
+  .signer-block .sig-img{
+    display:block; width:100%; height:78px; object-fit:contain; object-position:left bottom;
+  }
+  .sign-rule{ border:none; border-top:1px solid #444; margin:2px 0 8px; }
+  .printed-line{
+    font-family:var(--sans); font-size:14px; color:#1a1a1a; margin:1px 0;
+    display:flex; align-items:baseline; gap:6px;
+  }
+  .printed-line.ci{ padding-left:34px; }
+  .printed-line span.label{ white-space:nowrap; }
+  .printed-line span.value{ flex:1; min-width:0; }
+
+  @media (max-width:900px){
+    :root{ --page-w:100%; }
+    .page{ padding:28px 20px; }
+    .sig-grid{ grid-template-columns:1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="panel" id="loginPanel">
+  <h1>Panel privado  Firmas recolectadas</h1>
+  <p class="sub">Ingresa con tu cuenta de organizador para ver las firmas y generar el PDF final.</p>
+
+  <div class="field">
+    <label for="email">Correo</label>
+    <input type="email" id="email" autocomplete="username" spellcheck="false">
+  </div>
+  <div class="field">
+    <label for="pass">Contraseña</label>
+    <input type="password" id="pass" autocomplete="current-password">
+  </div>
+
+  <button class="btn" id="loginBtn" type="button">Entrar</button>
+  <div class="status" id="loginStatus"></div>
+</div>
+
+<div class="panel" id="mainPanel" hidden>
+  <h1>Panel privado — Firmas recolectadas</h1>
+  <div class="who-bar">
+    <span id="whoami"></span>
+    <button class="btn ghost small" type="button" id="logoutBtn">Cerrar sesión</button>
+  </div>
+  <div class="row">
+    <button class="btn" id="loadBtn" type="button">Actualizar firmas</button>
+    <button class="btn ghost" id="pdfBtn" type="button" disabled>Generar PDF</button>
+  </div>
+  <div class="status" id="status"></div>
+</div>
+
+<div class="list" id="list" hidden>
+  <div class="list-head">
+    <span id="listInfo"></span>
+    <span>
+      <button class="btn ghost small" type="button" id="selAll">Marcar todas</button>
+      <button class="btn ghost small" type="button" id="selNone">Desmarcar</button>
+    </span>
+  </div>
+  <div id="items"></div>
+</div>
+
+<div id="pages-root"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script>
+(function(){
+  // Datos públicos del proyecto (no son secretos: la clave anon solo permite insertar).
+  const SUPABASE_URL = 'https://ithfislojjtnbasvfrcy.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml0aGZpc2xvamp0bmJhc3ZmcmN5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ3NDQ3NDMsImV4cCI6MjEwMDMyMDc0M30.9c-mDUwYfO_8ONvdKVH7j2oAGYaYzFOSArIVSLANVY0';
+
+  const SLOTS_PER_EXTRA_PAGE = 10;   // 2 columnas x 5 filas por hoja de continuación
+  const SLOTS_PAGE_1 = 2;            // firmas que caben junto a la carta
+
+  const loginPanel = document.getElementById('loginPanel');
+  const mainPanel = document.getElementById('mainPanel');
+  const emailInput = document.getElementById('email');
+  const passInput = document.getElementById('pass');
+  const loginBtn = document.getElementById('loginBtn');
+  const loginStatus = document.getElementById('loginStatus');
+  const logoutBtn = document.getElementById('logoutBtn');
+  const whoami = document.getElementById('whoami');
+  const loadBtn = document.getElementById('loadBtn');
+  const pdfBtn = document.getElementById('pdfBtn');
+  const status = document.getElementById('status');
+  const list = document.getElementById('list');
+  const items = document.getElementById('items');
+  const listInfo = document.getElementById('listInfo');
+  const pagesRoot = document.getElementById('pages-root');
+
+  let sesion = null;   // { access_token, refresh_token, email }
+  let firmas = [];
+
+  function say(msg, isError){
+    status.className = isError ? 'status error' : 'status';
+    status.textContent = msg;
+  }
+  function sayLogin(msg, isError){
+    loginStatus.className = isError ? 'status error' : 'status';
+    loginStatus.textContent = msg;
+  }
+  function esc(s){
+    return String(s).replace(/[&<>"']/g, c => (
+      {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]
+    ));
+  }
+
+  const CARTA = `
+    <p>Santa Cruz de la Sierra, 22 de julio de 2026</p>
+    <div class="tight">
+      <p>Señor</p>
+      <p><strong>Ing. Wilmer Campos Saavedra</strong></p>
+      <p>Decano de la Universidad Privada Domingo Savio</p>
+      <p>Presente. -</p>
+    </div>
+    <p class="ref">Ref.: Solicitud de autorización para clases virtuales por motivos climatológicos</p>
+    <p>De mi mayor consideración:</p>
+    <p>Por medio de la presente, me dirijo a su autoridad para solicitar muy respetuosamente la autorización excepcional para que las clases programadas se desarrollen en modalidad virtual mientras persistan las condiciones climatológicas adversas que afectan la movilidad y seguridad de estudiantes y docentes.</p>
+    <p>Las intensas lluvias y las dificultades de tránsito representan un riesgo para el normal desplazamiento hacia el campus universitario. En ese sentido, la modalidad virtual permitirá garantizar la continuidad del proceso de enseñanza–aprendizaje sin afectar el desarrollo de los contenidos académicos.</p>
+    <p>Agradezco de antemano la atención brindada a la presente solicitud y quedo a la espera de una respuesta favorable.</p>
+    <p>Sin otro particular, me despido con las consideraciones más distinguidas.</p>
+    <p>Atentamente,</p>
+  `;
+
+  // ── Sesión ─────────────────────────────────────────────────────────────────
+  function guardarSesion(data, email){
+    sesion = {
+      access_token: data.access_token,
+      refresh_token: data.refresh_token,
+      email: (data.user && data.user.email) || email
+    };
+    localStorage.setItem('panel_sesion', JSON.stringify(sesion));
+  }
+
+  function mostrarPanel(){
+    loginPanel.hidden = true;
+    mainPanel.hidden = false;
+    whoami.textContent = 'Sesión iniciada como ' + sesion.email;
+  }
+
+  function cerrarSesion(){
+    sesion = null;
+    firmas = [];
+    localStorage.removeItem('panel_sesion');
+    list.hidden = true;
+    items.innerHTML = '';
+    pagesRoot.innerHTML = '';
+    mainPanel.hidden = true;
+    loginPanel.hidden = false;
+    sayLogin('');
+  }
+
+  async function login(){
+    const email = emailInput.value.trim();
+    const pass = passInput.value;
+    if (!email || !pass){ sayLogin('Escribe tu correo y contraseña.', true); return; }
+
+    loginBtn.disabled = true;
+    sayLogin('Verificando...');
+    try{
+      const res = await fetch(SUPABASE_URL + '/auth/v1/token?grant_type=password', {
+        method: 'POST',
+        headers: { 'apikey': SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password: pass })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error_description || data.msg || data.message || 'Credenciales incorrectas');
+      guardarSesion(data, email);
+      passInput.value = '';
+      mostrarPanel();
+      cargar();
+    } catch(err){
+      sayLogin('No se pudo entrar: ' + err.message, true);
+    } finally {
+      loginBtn.disabled = false;
+    }
+  }
+
+  async function refrescar(){
+    if (!sesion || !sesion.refresh_token) return false;
+    try{
+      const res = await fetch(SUPABASE_URL + '/auth/v1/token?grant_type=refresh_token', {
+        method: 'POST',
+        headers: { 'apikey': SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refresh_token: sesion.refresh_token })
+      });
+      if (!res.ok) return false;
+      guardarSesion(await res.json(), sesion.email);
+      return true;
+    } catch(e){ return false; }
+  }
+
+  // Llama a la API con el token del organizador; si expiró, lo renueva y reintenta.
+  async function api(path, opciones, reintento){
+    const res = await fetch(SUPABASE_URL + path, Object.assign({}, opciones, {
+      headers: Object.assign({
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': 'Bearer ' + sesion.access_token
+      }, (opciones && opciones.headers) || {})
+    }));
+    if (res.status === 401 && !reintento && await refrescar()) return api(path, opciones, true);
+    return res;
+  }
+
+  // ── Firmas ─────────────────────────────────────────────────────────────────
+  async function cargar(){
+    loadBtn.disabled = true;
+    say('Cargando firmas...');
+    try{
+      const res = await api('/rest/v1/firmas?select=*&order=creado_en.asc');
+      if (!res.ok) throw new Error(await res.text());
+      firmas = await res.json();
+      marcarDuplicados();
+      render();
+      pdfBtn.disabled = firmas.length === 0;
+      say(firmas.length === 0
+        ? 'Todavía no hay firmas. Comparte el link y vuelve a actualizar.'
+        : firmas.length + ' firma(s) cargada(s). Desmarca las que no quieras incluir en el PDF.');
+    } catch(err){
+      console.error(err);
+      say('No se pudieron cargar las firmas: ' + err.message, true);
+    } finally {
+      loadBtn.disabled = false;
+    }
+  }
+
+  function normCi(ci){ return String(ci).toLowerCase().replace(/[^a-z0-9]/g, ''); }
+
+  function marcarDuplicados(){
+    const vistos = new Set();
+    firmas.forEach(f => {
+      const k = normCi(f.ci);
+      f._dup = vistos.has(k);
+      f._incluir = !f._dup;
+      vistos.add(k);
+    });
+  }
+
+  function render(){
+    items.innerHTML = '';
+    firmas.forEach((f, i) => {
+      const el = document.createElement('div');
+      el.className = 'item' + (f._dup ? ' dup' : '');
+      el.innerHTML = `
+        <input type="checkbox" ${f._incluir ? 'checked' : ''} data-i="${i}">
+        <img src="${f.firma}" alt="firma">
+        <div class="who">
+          <b>${esc(f.nombre)}</b>
+          <small>C.I. ${esc(f.ci)}${f._dup ? ' · carnet repetido' : ''}</small>
+        </div>
+        <button class="del" type="button" data-del="${i}">Eliminar</button>
+      `;
+      items.appendChild(el);
+    });
+    listInfo.textContent = firmas.length + ' firma(s) en total';
+    list.hidden = firmas.length === 0;
+  }
+
+  items.addEventListener('change', e => {
+    const i = e.target.dataset.i;
+    if (i !== undefined) firmas[i]._incluir = e.target.checked;
+  });
+
+  items.addEventListener('click', async e => {
+    const i = e.target.dataset.del;
+    if (i === undefined) return;
+    const f = firmas[i];
+    if (!confirm('¿Eliminar definitivamente la firma de ' + f.nombre + '?')) return;
+    try{
+      const res = await api('/rest/v1/firmas?id=eq.' + f.id, { method: 'DELETE' });
+      if (!res.ok) throw new Error(await res.text());
+      firmas.splice(i, 1);
+      marcarDuplicados();
+      render();
+      pdfBtn.disabled = firmas.length === 0;
+      say('Firma eliminada.');
+    } catch(err){
+      say('No se pudo eliminar: ' + err.message, true);
+    }
+  });
+
+  document.getElementById('selAll').addEventListener('click', () => {
+    firmas.forEach(f => f._incluir = true); render();
+  });
+  document.getElementById('selNone').addEventListener('click', () => {
+    firmas.forEach(f => f._incluir = false); render();
+  });
+
+  // ── PDF ────────────────────────────────────────────────────────────────────
+  function bloqueFirma(f){
+    const div = document.createElement('div');
+    div.className = 'signer-block';
+    div.innerHTML = `
+      <img class="sig-img" src="${f.firma}" alt="">
+      <hr class="sign-rule">
+      <div class="printed-line">
+        <span class="label">Estudiante:</span>
+        <span class="value">${esc(f.nombre)}</span>
+      </div>
+      <div class="printed-line ci">
+        <span class="label">C.I.</span>
+        <span class="value">${esc(f.ci)}</span>
+      </div>
+    `;
+    return div;
+  }
+
+  function armarDocumento(seleccionadas){
+    pagesRoot.innerHTML = '';
+
+    const page1 = document.createElement('div');
+    page1.className = 'page';
+    const letter = document.createElement('div');
+    letter.className = 'letter';
+    letter.innerHTML = CARTA;
+    page1.appendChild(letter);
+    const grid1 = document.createElement('div');
+    grid1.className = 'sig-grid page1-grid';
+    seleccionadas.slice(0, SLOTS_PAGE_1).forEach(f => grid1.appendChild(bloqueFirma(f)));
+    page1.appendChild(grid1);
+    pagesRoot.appendChild(page1);
+
+    const resto = seleccionadas.slice(SLOTS_PAGE_1);
+    for (let i = 0; i < resto.length; i += SLOTS_PER_EXTRA_PAGE){
+      const pageEl = document.createElement('div');
+      pageEl.className = 'page';
+      const title = document.createElement('div');
+      title.className = 'grid-page-title';
+      title.textContent = 'Firmas de estudiantes (continuación)';
+      pageEl.appendChild(title);
+      const grid = document.createElement('div');
+      grid.className = 'sig-grid';
+      resto.slice(i, i + SLOTS_PER_EXTRA_PAGE).forEach(f => grid.appendChild(bloqueFirma(f)));
+      pageEl.appendChild(grid);
+      pagesRoot.appendChild(pageEl);
+    }
+  }
+
+  function esperarImagenes(){
+    const imgs = Array.from(pagesRoot.querySelectorAll('img'));
+    return Promise.all(imgs.map(img => img.complete
+      ? Promise.resolve()
+      : new Promise(r => { img.onload = img.onerror = r; })
+    ));
+  }
+
+  pdfBtn.addEventListener('click', async function(){
+    const seleccionadas = firmas.filter(f => f._incluir);
+    if (seleccionadas.length === 0){ say('No hay firmas marcadas.', true); return; }
+
+    pdfBtn.disabled = true;
+    say('Armando el documento con ' + seleccionadas.length + ' firma(s)...');
+
+    try{
+      armarDocumento(seleccionadas);
+      await esperarImagenes();
+      await new Promise(r => requestAnimationFrame(r));
+
+      const pageEls = Array.from(pagesRoot.querySelectorAll('.page'));
+      const { jsPDF } = window.jspdf;
+      const pdf = new jsPDF({ unit:'pt', format:'letter' });
+      const pageW = pdf.internal.pageSize.getWidth();
+      const pageH = pdf.internal.pageSize.getHeight();
+
+      for (let i = 0; i < pageEls.length; i++){
+        say('Generando hoja ' + (i + 1) + ' de ' + pageEls.length + '...');
+        const canvas = await html2canvas(pageEls[i], { scale:2, backgroundColor:'#FFFFFF' });
+        const imgData = canvas.toDataURL('image/jpeg', 0.95);
+        const ratio = Math.min(pageW / canvas.width, pageH / canvas.height);
+        const imgW = canvas.width * ratio;
+        const imgH = canvas.height * ratio;
+        if (i > 0) pdf.addPage();
+        pdf.addImage(imgData, 'JPEG', (pageW - imgW) / 2, 0, imgW, imgH);
+      }
+
+      pdf.save('Solicitud_Clases_Virtuales_Firmada.pdf');
+      say('PDF descargado con ' + seleccionadas.length + ' firma(s) en ' + pageEls.length + ' hoja(s).');
+    } catch(err){
+      console.error(err);
+      say('Ocurrió un error generando el PDF: ' + err.message, true);
+    } finally {
+      pdfBtn.disabled = false;
+    }
+  });
+
+  loginBtn.addEventListener('click', login);
+  logoutBtn.addEventListener('click', cerrarSesion);
+  loadBtn.addEventListener('click', cargar);
+  passInput.addEventListener('keydown', e => { if (e.key === 'Enter') login(); });
+
+  // Restaura la sesión anterior si sigue vigente.
+  (async function(){
+    const guardada = localStorage.getItem('panel_sesion');
+    if (!guardada) return;
+    try{
+      sesion = JSON.parse(guardada);
+      if (await refrescar()){ mostrarPanel(); cargar(); }
+      else cerrarSesion();
+    } catch(e){ cerrarSesion(); }
+  })();
+})();
+</script>
+
+</body>
+</html>
