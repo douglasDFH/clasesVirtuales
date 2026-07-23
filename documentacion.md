@@ -21,9 +21,22 @@ Organizador (panel_firmas.html) ◄──GET────── │  · tabla "fi
                      PDF final ◄─────────────┴──────────────────────┘
 ```
 
-- **Frontend:** 2 archivos HTML estáticos (se pueden alojar en cualquier hosting o abrir localmente).
+- **Frontend:** archivos HTML estáticos, **publicados en GitHub Pages**.
 - **Backend:** Supabase (`https://ithfislojjtnbasvfrcy.supabase.co`).
 - **Generación de PDF:** en el navegador, con `html2canvas` + `jsPDF` (cargados por CDN).
+
+### URLs públicas (GitHub Pages)
+
+El sitio se publica desde la rama `main` (carpeta raíz) del repositorio
+`douglasDFH/clasesVirtuales`:
+
+| Página | URL |
+|--------|-----|
+| Firmas (público) | `https://douglasdfh.github.io/clasesVirtuales/` |
+| Panel del organizador | `https://douglasdfh.github.io/clasesVirtuales/panel_firmas.html` |
+| Recuperar contraseña | `https://douglasdfh.github.io/clasesVirtuales/recuperar.html` |
+
+Cada `git push` a `main` vuelve a desplegar el sitio automáticamente.
 
 ---
 
@@ -57,6 +70,32 @@ Panel administrativo protegido con **login de Supabase Auth** (correo + contrase
    - Página 1: la carta + hasta **2 firmas** (`SLOTS_PAGE_1`).
    - Páginas siguientes: grilla de 2×5 = **10 firmas por hoja** (`SLOTS_PER_EXTRA_PAGE`).
    - Cada hoja se rasteriza con `html2canvas` (scale 2) y se agrega al PDF tamaño **carta** con `jsPDF`. Se descarga como `Solicitud_Clases_Virtuales_Firmada.pdf`.
+
+---
+
+## 3b. `recuperar.html` — Cambiar / recuperar la contraseña del organizador
+
+La contraseña del organizador es la de su cuenta en **Supabase Auth** (no está en el
+código). Para cambiarla cuando **se olvida** (no puedes entrar al panel):
+
+1. En el panel de Supabase → **Authentication → Users**, se abre el usuario y se pulsa
+   **"Send password recovery"** (envía un correo).
+2. El correo trae un enlace que Supabase redirige a la **Site URL** configurada, con un
+   token de recuperación en el fragmento (`#access_token=...&type=recovery`).
+3. Ese enlace abre **`recuperar.html`**, que lee el token y muestra un formulario para
+   escribir la contraseña nueva. Al guardar, hace `PUT /auth/v1/user` con el token.
+
+### Configuración necesaria en Supabase (Authentication → URL Configuration)
+
+Para que el correo de recuperación funcione (antes redirigía a `http://localhost:3000`
+y daba **404**), se dejó configurado así:
+
+| Campo | Valor |
+|-------|-------|
+| **Site URL** | `https://douglasdfh.github.io/clasesVirtuales/recuperar.html` |
+| **Redirect URLs** | `https://douglasdfh.github.io/clasesVirtuales/**` |
+
+> El token de recuperación dura **1 hora**. Si expira, se solicita un correo nuevo.
 
 ---
 
