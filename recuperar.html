@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cambiar contraseña Organizador</title>
+<style>
+  :root{
+    --bg:#EDEBE4; --navy:#1F4E79; --navy-dark:#163a5c;
+    --danger:#9C3B3B; --ok:#2f6b46; --muted:#6b6b6b;
+    --ui:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:var(--ui);background:var(--bg);min-height:100vh;
+    display:flex;align-items:center;justify-content:center;padding:20px;}
+  .card{background:#fff;border:1px solid #ddd8c8;border-radius:10px;
+    padding:28px 30px;max-width:420px;width:100%;box-shadow:0 8px 24px rgba(0,0,0,.1);}
+  h1{font-size:17px;color:var(--navy-dark);margin:0 0 6px;}
+  .sub{font-size:12.5px;color:var(--muted);margin:0 0 20px;line-height:1.5;}
+  label{display:block;font-size:12px;font-weight:600;color:var(--navy-dark);margin:0 0 5px;}
+  input{width:100%;font-size:15px;padding:11px 12px;border:1px solid #ccc6b6;
+    border-radius:6px;margin-bottom:16px;}
+  input:focus{outline:none;border-color:var(--navy);}
+  button{width:100%;background:var(--navy);color:#fff;border:none;font-family:var(--ui);
+    font-weight:700;font-size:15px;padding:14px;border-radius:6px;cursor:pointer;}
+  button:hover{background:var(--navy-dark);}
+  button:disabled{background:#9aa7b1;cursor:not-allowed;}
+  .status{font-size:13px;margin-top:14px;min-height:18px;line-height:1.5;text-align:center;}
+  .status.error{color:var(--danger);}
+  .status.ok{color:var(--ok);font-weight:600;}
+  .email{font-weight:600;color:var(--navy-dark);}
+  .back{display:block;text-align:center;margin-top:16px;font-size:12.5px;color:var(--navy);}
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>Cambiar contraseña</h1>
+  <p class="sub" id="sub">Establece una contraseña nueva para tu cuenta de organizador.</p>
+
+  <div id="form">
+    <label for="p1">Nueva contraseña</label>
+    <input type="password" id="p1" autocomplete="new-password" placeholder="Mínimo 6 caracteres">
+    <label for="p2">Repite la contraseña</label>
+    <input type="password" id="p2" autocomplete="new-password" placeholder="Vuelve a escribirla">
+    <button id="btn" type="button">Guardar contraseña</button>
+  </div>
+
+  <div class="status" id="status"></div>
+  <a class="back" href="panel_firmas.html">Ir al panel</a>
+</div>
+
+<script>
+(function(){
+  const SUPABASE_URL = 'https://ithfislojjtnbasvfrcy.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml0aGZpc2xvamp0bmJhc3ZmcmN5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ3NDQ3NDMsImV4cCI6MjEwMDMyMDc0M30.9c-mDUwYfO_8ONvdKVH7j2oAGYaYzFOSArIVSLANVY0';
+
+  const status = document.getElementById('status');
+  const form = document.getElementById('form');
+  const sub = document.getElementById('sub');
+  const btn = document.getElementById('btn');
+
+  function say(msg, cls){ status.className = 'status ' + (cls||''); status.textContent = msg; }
+
+  // Lee los parámetros del fragmento (#access_token=...&type=recovery) que agrega Supabase.
+  const params = new URLSearchParams(location.hash.replace(/^#/, ''));
+  const token = params.get('access_token');
+  const type = params.get('type');
+
+  if (!token){
+    form.style.display = 'none';
+    say('Abre esta página desde el enlace del correo de recuperación de Supabase. No se encontró un token válido.', 'error');
+  } else if (type && type !== 'recovery'){
+    form.style.display = 'none';
+    say('Este enlace no es de recuperación de contraseña.', 'error');
+  } else {
+    // Muestra a qué cuenta pertenece el token, leyéndolo del propio JWT.
+    try{
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      if (payload.email) sub.innerHTML = 'Vas a cambiar la contraseña de <span class="email">' + payload.email + '</span>.';
+    }catch(e){}
+  }
+
+  btn.addEventListener('click', async function(){
+    const p1 = document.getElementById('p1').value;
+    const p2 = document.getElementById('p2').value;
+    if (p1.length < 6){ say('La contraseña debe tener al menos 6 caracteres.', 'error'); return; }
+    if (p1 !== p2){ say('Las dos contraseñas no coinciden.', 'error'); return; }
+
+    btn.disabled = true;
+    say('Guardando...');
+    try{
+      const res = await fetch(SUPABASE_URL + '/auth/v1/user', {
+        method: 'PUT',
+        headers: {
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': 'Bearer ' + token,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ password: p1 })
+      });
+      const data = await res.json();
+      if (!res.ok){
+        throw new Error(data.msg || data.error_description || data.message || ('HTTP ' + res.status));
+      }
+      form.style.display = 'none';
+      say('¡Contraseña actualizada! Ya puedes iniciar sesión en el panel con tu nueva contraseña.', 'ok');
+    }catch(err){
+      say('No se pudo cambiar: ' + err.message + '. Si el enlace expiró (dura 1 hora), solicita uno nuevo.', 'error');
+      btn.disabled = false;
+    }
+  });
+})();
+</script>
+</body>
+</html>
